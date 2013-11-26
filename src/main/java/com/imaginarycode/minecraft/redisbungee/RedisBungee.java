@@ -44,8 +44,9 @@ import static com.google.common.base.Preconditions.*;
  * The only function of interest is {@link #getApi()}, which exposes some functions in this class.
  */
 public final class RedisBungee extends Plugin implements Listener {
-    private static final ServerPing.PlayerInfo[] EMPTY_PLAYERINFO = new ServerPing.PlayerInfo[]{};
     private static Configuration configuration;
+    private RedisBungeeCommandSender commandSender = new RedisBungeeCommandSender();
+    private static RedisBungeeConfiguration configuration = new RedisBungeeConfiguration();
     private JedisPool pool;
     private static RedisBungeeAPI api;
     private PubSubListener psl = null;
@@ -359,22 +360,7 @@ public final class RedisBungee extends Plugin implements Listener {
     @EventHandler
     public void onPing(ProxyPingEvent event) {
         ServerPing old = event.getResponse();
-        ServerPing reply = new ServerPing();
-        if (configuration.getBoolean("player-list-in-ping", false)) {
-            Set<String> players = getPlayers();
-            ServerPing.PlayerInfo[] info = new ServerPing.PlayerInfo[players.size()];
-            int idx = 0;
-            for (String player : players) {
-                info[idx] = new ServerPing.PlayerInfo(player, "");
-                idx++;
-            }
-            reply.setPlayers(new ServerPing.Players(old.getPlayers().getMax(), players.size(), info));
-        } else {
-            reply.setPlayers(new ServerPing.Players(old.getPlayers().getMax(), getCount(), EMPTY_PLAYERINFO));
-        }
-        reply.setDescription(old.getDescription());
-        reply.setFavicon(old.getFavicon());
-        reply.setVersion(old.getVersion());
+        ServerPing reply = new ServerPing(old.getProtocolVersion(), old.getGameVersion(), old.getMotd(), getCount(), old.getMaxPlayers());
         event.setResponse(reply);
     }
 
