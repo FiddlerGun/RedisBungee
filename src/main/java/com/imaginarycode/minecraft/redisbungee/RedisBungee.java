@@ -22,6 +22,8 @@ import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisException;
 
 import java.io.*;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -31,7 +33,8 @@ import java.util.logging.Level;
  * <p/>
  * The only function of interest is {@link #getApi()}, which exposes some functions in this class.
  */
-public class RedisBungee extends Plugin implements Listener {
+public final class RedisBungee extends Plugin implements Listener {
+    private static final ServerPing.PlayerInfo[] EMPTY_PLAYERINFO = new ServerPing.PlayerInfo[]{};
     private RedisBungeeCommandSender commandSender = new RedisBungeeCommandSender();
     private static RedisBungeeConfiguration configuration = new RedisBungeeConfiguration();
     private JedisPool pool;
@@ -52,7 +55,7 @@ public class RedisBungee extends Plugin implements Listener {
         return configuration;
     }
 
-    public int getCount() {
+    protected final int getCount() {
         int c = plugin.getProxy().getOnlineCount();
         if (pool != null) {
             Jedis rsc = pool.getResource();
@@ -69,7 +72,7 @@ public class RedisBungee extends Plugin implements Listener {
         return c;
     }
 
-    public Set<String> getPlayers() {
+    protected final Set<String> getPlayers() {
         Set<String> players = new HashSet<>();
         for (ProxiedPlayer pp : plugin.getProxy().getPlayers()) {
             players.add(pp.getName());
@@ -88,7 +91,7 @@ public class RedisBungee extends Plugin implements Listener {
         return ImmutableSet.copyOf(players);
     }
 
-    public ServerInfo getServerFor(String name) {
+    protected final ServerInfo getServerFor(String name) {
         ServerInfo server = null;
         if (plugin.getProxy().getPlayer(name) != null) return plugin.getProxy().getPlayer(name).getServer().getInfo();
         if (pool != null) {
@@ -107,7 +110,7 @@ public class RedisBungee extends Plugin implements Listener {
         return TimeUnit.SECONDS.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     }
 
-    public long getLastOnline(String name) {
+    protected final long getLastOnline(String name) {
         long time = -1L;
         if (plugin.getProxy().getPlayer(name) != null) return 0;
         if (pool != null) {
@@ -120,6 +123,24 @@ public class RedisBungee extends Plugin implements Listener {
             }
         }
         return time;
+    }
+
+    protected final InetAddress getIpAddress(String name) {
+        if (plugin.getProxy().getPlayer(name) != null)
+            return plugin.getProxy().getPlayer(name).getAddress().getAddress();
+        InetAddress ia = null;
+        if (pool != null) {
+            Jedis tmpRsc = pool.getResource();
+            try {
+                if (tmpRsc.hexists("player:" + name, "ip"))
+                    ia = InetAddress.getByName(tmpRsc.hget("player:" + name, "ip"));
+            } catch (UnknownHostException ignored) {
+                // Best to just return null
+            } finally {
+                pool.returnResource(tmpRsc);
+            }
+        }
+        return ia;
     }
 
     @Override
@@ -157,6 +178,7 @@ public class RedisBungee extends Plugin implements Listener {
             getProxy().getPluginManager().registerCommand(this, new RedisBungeeCommands.GlistCommand());
             getProxy().getPluginManager().registerCommand(this, new RedisBungeeCommands.FindCommand());
             getProxy().getPluginManager().registerCommand(this, new RedisBungeeCommands.LastSeenCommand());
+            getProxy().getPluginManager().registerCommand(this, new RedisBungeeCommands.IpCommand());
             getProxy().getPluginManager().registerListener(this, this);
             api = new RedisBungeeAPI(this);
             psl = new PubSubListener();
@@ -297,6 +319,7 @@ public class RedisBungee extends Plugin implements Listener {
             try {
                 rsc.sadd("server:" + configuration.getServerId() + ":usersOnline", event.getPlayer().getName());
                 rsc.hset("player:" + event.getPlayer().getName(), "online", "0");
+                rsc.hset("player:" + event.getPlayer().getName(), "ip", event.getPlayer().getAddress().getAddress().getHostAddress());
             } finally {
                 pool.returnResource(rsc);
             }
@@ -314,6 +337,7 @@ public class RedisBungee extends Plugin implements Listener {
                 rsc.srem("server:" + configuration.getServerId() + ":usersOnline", event.getPlayer().getName());
                 rsc.hset("player:" + event.getPlayer().getName(), "online", String.valueOf(getUnixTimestamp()));
                 rsc.hdel("player:" + event.getPlayer().getName(), "server");
+                rsc.hdel("player:" + event.getPlayer().getName(), "ip");
             } finally {
                 pool.returnResource(rsc);
             }
@@ -335,7 +359,22 @@ public class RedisBungee extends Plugin implements Listener {
     @EventHandler
     public void onPing(ProxyPingEvent event) {
         ServerPing old = event.getResponse();
-        ServerPing reply = new ServerPing(old.getProtocolVersion(), old.getGameVersion(), old.getMotd(), getCount(), old.getMaxPlayers());
+        ServerPing reply = new ServerPing();
+        if (configuration.isPlayerListInPing()) {
+            Set<String> players = getPlayers();
+            ServerPing.PlayerInfo[] info = new ServerPing.PlayerInfo[players.size()];
+            int idx = 0;
+            for (String player : players) {
+                info[idx] = new ServerPing.PlayerInfo(player, "");
+                idx++;
+            }
+            reply.setPlayers(new ServerPing.Players(old.getPlayers().getMax(), players.size(), info));
+        } else {
+            reply.setPlayers(new ServerPing.Players(old.getPlayers().getMax(), getCount(), EMPTY_PLAYERINFO));
+        }
+        reply.setDescription(old.getDescription());
+        reply.setFavicon(old.getFavicon());
+        reply.setVersion(old.getVersion());
         event.setResponse(reply);
     }
 
