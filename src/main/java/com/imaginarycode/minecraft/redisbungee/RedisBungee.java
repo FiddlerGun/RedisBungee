@@ -45,8 +45,6 @@ import static com.google.common.base.Preconditions.*;
  */
 public final class RedisBungee extends Plugin implements Listener {
     private static Configuration configuration;
-    private RedisBungeeCommandSender commandSender = new RedisBungeeCommandSender();
-    private static RedisBungeeConfiguration configuration = new RedisBungeeConfiguration();
     private JedisPool pool;
     private static RedisBungeeAPI api;
     private PubSubListener psl = null;
@@ -299,7 +297,7 @@ public final class RedisBungee extends Plugin implements Listener {
     }
 
     @EventHandler
-    public void onPreLogin(PreLoginEvent event) {
+    public void onPreLogin(LoginEvent event) {
         if (pool != null) {
             Jedis rsc = pool.getResource();
             try {
