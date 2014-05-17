@@ -11,9 +11,9 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.io.ByteStreams;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.Gson;
-import com.imaginarycode.minecraft.redisbungee.events.PubSubMessageEvent;
+import com.google.gson.JsonParser;
+import com.imaginarycode.minecraft.redisbungee.pubsub.GenericPubSubListener;
 import com.imaginarycode.minecraft.redisbungee.util.UUIDTranslator;
 import lombok.Getter;
 import lombok.NonNull;
@@ -26,7 +26,6 @@ import net.md_5.bungee.config.YamlConfiguration;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisException;
 
@@ -34,8 +33,6 @@ import java.io.*;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
@@ -51,11 +48,13 @@ public final class RedisBungee extends Plugin {
     @Getter
     private JedisPool pool;
     @Getter
-    private RedisBungeeConsumer consumer;
+    private RedisBungeeEventConsumer consumer;
     @Getter
     private UUIDTranslator uuidTranslator;
     @Getter
     private static Gson gson = new Gson();
+    @Getter
+    private static JsonParser jsonParser = new JsonParser();
     private static RedisBungeeAPI api;
     private static PubSubListener psl = null;
     private List<String> serverIds;
@@ -339,7 +338,7 @@ public final class RedisBungee extends Plugin {
                     globalCount = getCurrentCount();
                 }
             }, 0, 3, TimeUnit.SECONDS);
-            consumer = new RedisBungeeConsumer(this);
+            consumer = new RedisBungeeEventConsumer(this);
             new Thread(consumer, "RedisBungee Consumer Thread").start();
             getProxy().getPluginManager().registerCommand(this, new RedisBungeeCommands.GlistCommand(this));
             getProxy().getPluginManager().registerCommand(this, new RedisBungeeCommands.FindCommand(this));
@@ -480,7 +479,7 @@ public final class RedisBungee extends Plugin {
 
     class PubSubListener implements Runnable {
         private Jedis rsc;
-        private JedisPubSubHandler jpsh;
+        private GenericPubSubListener listener;
 
         private PubSubListener() {
         }
@@ -489,53 +488,18 @@ public final class RedisBungee extends Plugin {
         public void run() {
             try {
                 rsc = pool.getResource();
-                jpsh = new JedisPubSubHandler();
-                rsc.subscribe(jpsh, "redisbungee-" + configuration.getString("server-id"), "redisbungee-allservers");
+                listener = new GenericPubSubListener(RedisBungee.this);
+                rsc.subscribe(listener, "redisbungee-" + configuration.getString("server-id"), "redisbungee-allservers", "redisbungee-firehose");
             } catch (JedisException | ClassCastException ignored) {
             }
         }
 
         public void addChannel(String... channel) {
-            jpsh.subscribe(channel);
+            listener.subscribe(channel);
         }
 
         public void removeChannel(String... channel) {
-            jpsh.unsubscribe(channel);
-        }
-    }
-
-    class JedisPubSubHandler extends JedisPubSub {
-        private ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("RedisBungee PubSub Handler - #%d").build());
-
-        @Override
-        public void onMessage(final String s, final String s2) {
-            if (s2.trim().length() == 0) return;
-            executor.submit(new Runnable() {
-                @Override
-                public void run() {
-                    getProxy().getPluginManager().callEvent(new PubSubMessageEvent(s, s2));
-                }
-            });
-        }
-
-        @Override
-        public void onPMessage(String s, String s2, String s3) {
-        }
-
-        @Override
-        public void onSubscribe(String s, int i) {
-        }
-
-        @Override
-        public void onUnsubscribe(String s, int i) {
-        }
-
-        @Override
-        public void onPUnsubscribe(String s, int i) {
-        }
-
-        @Override
-        public void onPSubscribe(String s, int i) {
+            listener.unsubscribe(channel);
         }
     }
 }

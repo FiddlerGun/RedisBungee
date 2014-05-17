@@ -158,7 +158,7 @@ public class RedisBungeeAPI {
     }
 
     /**
-     * Register (a) PubSub channel(s), so that you may capture {@link com.imaginarycode.minecraft.redisbungee.events.PubSubMessageEvent} for it.
+     * Register (a) PubSub channel(s), so that you may capture {@link com.imaginarycode.minecraft.redisbungee.events.pubsub.PubSubMessageEvent} for it.
      *
      * @param channels the channels to register
      * @since 0.2.6

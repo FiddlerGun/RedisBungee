@@ -13,7 +13,7 @@ import com.google.common.io.ByteStreams;
 import com.imaginarycode.minecraft.redisbungee.consumerevents.PlayerChangedServerConsumerEvent;
 import com.imaginarycode.minecraft.redisbungee.consumerevents.PlayerLoggedInConsumerEvent;
 import com.imaginarycode.minecraft.redisbungee.consumerevents.PlayerLoggedOffConsumerEvent;
-import com.imaginarycode.minecraft.redisbungee.events.PubSubMessageEvent;
+import com.imaginarycode.minecraft.redisbungee.events.pubsub.PubSubMessageEvent;
 import lombok.AllArgsConstructor;
 import net.md_5.bungee.api.ServerPing;
 import net.md_5.bungee.api.connection.Server;

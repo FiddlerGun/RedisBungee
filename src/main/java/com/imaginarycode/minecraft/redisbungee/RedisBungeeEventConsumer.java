@@ -6,6 +6,7 @@
  */
 package com.imaginarycode.minecraft.redisbungee;
 
+import com.google.gson.JsonObject;
 import com.imaginarycode.minecraft.redisbungee.consumerevents.ConsumerEvent;
 import com.imaginarycode.minecraft.redisbungee.consumerevents.PlayerChangedServerConsumerEvent;
 import com.imaginarycode.minecraft.redisbungee.consumerevents.PlayerLoggedInConsumerEvent;
@@ -17,7 +18,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 @RequiredArgsConstructor
-public class RedisBungeeConsumer implements Runnable {
+public class RedisBungeeEventConsumer implements Runnable {
     private final RedisBungee plugin;
     private BlockingQueue<ConsumerEvent> consumerQueue = new LinkedBlockingQueue<>();
     private boolean stopped = false;
@@ -69,5 +70,26 @@ public class RedisBungeeConsumer implements Runnable {
     public void stop() {
         stopped = true;
         while (!consumerQueue.isEmpty()) ;
+    }
+
+    private String createFirehoseJson(ConsumerEvent event) {
+        JsonObject object = new JsonObject();
+
+        if (event instanceof PlayerLoggedInConsumerEvent) {
+            PlayerLoggedInConsumerEvent event1 = (PlayerLoggedInConsumerEvent) event;
+            object.addProperty("type", "login");
+            object.addProperty("uuid", event1.getPlayer().getName());
+        } else if (event instanceof PlayerLoggedOffConsumerEvent) {
+            PlayerLoggedOffConsumerEvent event1 = (PlayerLoggedOffConsumerEvent) event;
+            object.addProperty("type", "logoff");
+            object.addProperty("uuid", event1.getPlayer().getName());
+        } else if (event instanceof PlayerChangedServerConsumerEvent) {
+            PlayerChangedServerConsumerEvent event1 = (PlayerChangedServerConsumerEvent) event;
+            object.addProperty("type", "server");
+            object.addProperty("uuid", event1.getPlayer().getName());
+            object.addProperty("server", event1.getNewServer().getName());
+        }
+
+        return RedisBungee.getGson().toJson(object);
     }
 }
