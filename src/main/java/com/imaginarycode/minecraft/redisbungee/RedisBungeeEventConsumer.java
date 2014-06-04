@@ -20,7 +20,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 @RequiredArgsConstructor
 public class RedisBungeeEventConsumer implements Runnable {
     private final RedisBungee plugin;
-    private BlockingQueue<ConsumerEvent> consumerQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<ConsumerEvent> consumerQueue = new LinkedBlockingQueue<>();
     private boolean stopped = false;
 
     @Override
@@ -47,7 +47,7 @@ public class RedisBungeeEventConsumer implements Runnable {
     private void handle(ConsumerEvent event, Jedis jedis) {
         if (event instanceof PlayerLoggedInConsumerEvent) {
             PlayerLoggedInConsumerEvent event1 = (PlayerLoggedInConsumerEvent) event;
-            jedis.sadd("server:" + RedisBungee.getConfiguration().getString("server-id", "") + ":usersOnline", event1.getPlayer().getUniqueId().toString());
+            jedis.sadd("server:" + RedisBungee.getApi().getServerId() + ":usersOnline", event1.getPlayer().getUniqueId().toString());
             jedis.hset("player:" + event1.getPlayer().getUniqueId().toString(), "online", "0");
             jedis.hset("player:" + event1.getPlayer().getUniqueId().toString(), "ip", event1.getPlayer().getAddress().getAddress().getHostAddress());
             jedis.hset("player:" + event1.getPlayer().getUniqueId().toString(), "name", event1.getPlayer().getName());

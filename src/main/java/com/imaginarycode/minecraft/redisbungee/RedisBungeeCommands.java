@@ -60,7 +60,7 @@ class RedisBungeeCommands {
                             Multimap<String, UUID> serverToPlayers = RedisBungee.getApi().getServerToPlayers();
                             Multimap<String, String> human = HashMultimap.create();
                             for (Map.Entry<String, UUID> entry : serverToPlayers.entries()) {
-                                human.put(entry.getKey(), plugin.getUuidTranslator().getNameFromUuid(entry.getValue()));
+                                human.put(entry.getKey(), plugin.getUuidTranslator().getNameFromUuid(entry.getValue(), false));
                             }
                             for (String server : new TreeSet<>(serverToPlayers.keySet())) {
                                 TextComponent serverName = new TextComponent();
@@ -75,7 +75,7 @@ class RedisBungeeCommands {
                                 sender.sendMessage(serverName, serverCount, serverPlayers);
                             }
                         } else {
-                            sender.sendMessage(new ComponentBuilder("Players: " + Joiner.on(", ").join(RedisBungee.getApi().getPlayersOnline()))
+                            sender.sendMessage(new ComponentBuilder("Players: " + Joiner.on(", ").join(RedisBungee.getApi().getHumanPlayersOnline()))
                                     .color(ChatColor.YELLOW).create());
                         }
                         sender.sendMessage(playersOnline);
@@ -102,7 +102,7 @@ class RedisBungeeCommands {
                 @Override
                 public void run() {
                     if (args.length > 0) {
-                        UUID uuid = plugin.getUuidTranslator().getTranslatedUuid(args[0]);
+                        UUID uuid = plugin.getUuidTranslator().getTranslatedUuid(args[0], true);
                         if (uuid == null) {
                             sender.sendMessage(PLAYER_NOT_FOUND);
                             return;
@@ -138,7 +138,7 @@ class RedisBungeeCommands {
                 @Override
                 public void run() {
                     if (args.length > 0) {
-                        UUID uuid = plugin.getUuidTranslator().getTranslatedUuid(args[0]);
+                        UUID uuid = plugin.getUuidTranslator().getTranslatedUuid(args[0], true);
                         if (uuid == null) {
                             sender.sendMessage(PLAYER_NOT_FOUND);
                             return;
@@ -148,16 +148,14 @@ class RedisBungeeCommands {
                         if (secs == 0) {
                             message.setColor(ChatColor.GREEN);
                             message.setText(args[0] + " is currently online.");
-                            sender.sendMessage(message);
                         } else if (secs != -1) {
                             message.setColor(ChatColor.BLUE);
                             message.setText(args[0] + " was last online on " + new SimpleDateFormat().format(secs) + ".");
-                            sender.sendMessage(message);
                         } else {
                             message.setColor(ChatColor.RED);
                             message.setText(args[0] + " has never been online.");
-                            sender.sendMessage(message);
                         }
+                        sender.sendMessage(message);
                     } else {
                         sender.sendMessage(NO_PLAYER_SPECIFIED);
                     }
@@ -180,7 +178,7 @@ class RedisBungeeCommands {
                 @Override
                 public void run() {
                     if (args.length > 0) {
-                        UUID uuid = plugin.getUuidTranslator().getTranslatedUuid(args[0]);
+                        UUID uuid = plugin.getUuidTranslator().getTranslatedUuid(args[0], true);
                         if (uuid == null) {
                             sender.sendMessage(PLAYER_NOT_FOUND);
                             return;
@@ -190,6 +188,7 @@ class RedisBungeeCommands {
                             TextComponent message = new TextComponent();
                             message.setColor(ChatColor.GREEN);
                             message.setText(args[0] + " is connected from " + ia.toString() + ".");
+                            sender.sendMessage(message);
                         } else {
                             sender.sendMessage(PLAYER_NOT_FOUND);
                         }
@@ -217,6 +216,7 @@ class RedisBungeeCommands {
                 TextComponent message = new TextComponent();
                 message.setColor(ChatColor.GREEN);
                 message.setText("Sent the command /" + command + " to all proxies.");
+                sender.sendMessage(message);
             } else {
                 sender.sendMessage(NO_COMMAND_SPECIFIED);
             }

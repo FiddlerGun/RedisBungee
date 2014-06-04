@@ -15,7 +15,9 @@ import com.imaginarycode.minecraft.redisbungee.consumerevents.PlayerLoggedInCons
 import com.imaginarycode.minecraft.redisbungee.consumerevents.PlayerLoggedOffConsumerEvent;
 import com.imaginarycode.minecraft.redisbungee.events.pubsub.PubSubMessageEvent;
 import lombok.AllArgsConstructor;
+import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.ServerPing;
+import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.connection.Server;
 import net.md_5.bungee.api.event.*;
 import net.md_5.bungee.api.plugin.Listener;
@@ -29,25 +31,21 @@ public class RedisBungeeListener implements Listener {
     private final RedisBungee plugin;
 
     @EventHandler
-    public void onPreLogin(PreLoginEvent event) {
+    public void onPlayerConnect(final PostLoginEvent event) {
         if (plugin.getPool() != null) {
             Jedis rsc = plugin.getPool().getResource();
             try {
                 for (String server : plugin.getServerIds()) {
-                    if (rsc.sismember("server:" + server + ":usersOnline", event.getConnection().getName())) {
-                        event.setCancelled(true);
-                        event.setCancelReason("You are already logged on to this server.");
-                        break;
+                    if (rsc.sismember("server:" + server + ":usersOnline", event.getPlayer().getUniqueId().toString())) {
+                        event.getPlayer().disconnect(new ComponentBuilder("You are already logged on to this server.").color(
+                                ChatColor.RED).create());
+                        return;
                     }
                 }
             } finally {
                 plugin.getPool().returnResource(rsc);
             }
         }
-    }
-
-    @EventHandler
-    public void onPlayerConnect(final PostLoginEvent event) {
         plugin.getConsumer().queue(new PlayerLoggedInConsumerEvent(event.getPlayer()));
     }
 
@@ -70,7 +68,7 @@ public class RedisBungeeListener implements Listener {
             ServerPing.PlayerInfo[] info = new ServerPing.PlayerInfo[players.size()];
             int idx = 0;
             for (UUID player : players) {
-                info[idx] = new ServerPing.PlayerInfo(plugin.getUuidTranslator().getNameFromUuid(player), "");
+                info[idx] = new ServerPing.PlayerInfo(plugin.getUuidTranslator().getNameFromUuid(player, false), "");
                 idx++;
             }
             reply.setPlayers(new ServerPing.Players(old.getPlayers().getMax(), players.size(), info));
@@ -112,7 +110,7 @@ public class RedisBungeeListener implements Listener {
                             }
                             Set<String> players = new HashSet<>();
                             for (UUID uuid : original)
-                                players.add(plugin.getUuidTranslator().getNameFromUuid(uuid));
+                                players.add(plugin.getUuidTranslator().getNameFromUuid(uuid, false));
                             out.writeUTF(Joiner.on(',').join(players));
                             break;
                         case "PlayerCount":
@@ -135,7 +133,7 @@ public class RedisBungeeListener implements Listener {
                             String user = in.readUTF();
                             out.writeUTF("LastOnline");
                             out.writeUTF(user);
-                            out.writeLong(plugin.getLastOnline(plugin.getUuidTranslator().getTranslatedUuid(user)));
+                            out.writeLong(plugin.getLastOnline(plugin.getUuidTranslator().getTranslatedUuid(user, true)));
                             break;
                         default:
                             break;
@@ -149,7 +147,7 @@ public class RedisBungeeListener implements Listener {
 
     @EventHandler
     public void onPubSubMessage(PubSubMessageEvent event) {
-        if (event.getChannel().equals("redisbungee-allservers") || event.getChannel().equals("redisbungee-" + RedisBungee.getConfiguration().getString("server-id"))) {
+        if (event.getChannel().equals("redisbungee-allservers") || event.getChannel().equals("redisbungee-" + RedisBungee.getApi().getServerId())) {
             String message = event.getMessage();
             if (message.startsWith("/"))
                 message = message.substring(1);
